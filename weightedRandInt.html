@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.16.0/ace.js" integrity="sha512-Km4SIAd8d2xB73+j5NmOjzIxriadCWR9xapO/YARlvfwkgrWneSpV/6GeaRzVLNckFHzUn9Iv1oGbsDW/HtTZQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<style>
+html,body {
+  min-height: 100%;
+}
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+  margin: 0;
+  padding: 0.5em 1em;
+  box-sizing: border-box;
+  /* display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center; */
+}
+
+textarea {
+	
+	width: 30em;
+	height: 10em;
+	
+}
+#graph {
+	
+	/* width: 10em; */
+
+	max-height: calc(100svh - 21em);
+	display: block;
+	margin: auto;
+}
+#fn { 
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	width: 20em;
+	height: 22em;
+}
+.ace_editor {
+	width: 100%;
+	height: 22em;
+}
+</style>
+<body>
+
+<div>
+	<svg id="graph" viewbox="0 5 110 120">
+		<g font-family="Arial" font-size="7">
+			<text x="10" y="120" text-anchor="middle">0</text>
+			<text x="20" y="120" text-anchor="middle">1</text>
+			<text x="30" y="120" text-anchor="middle">2</text>
+			<text x="40" y="120" text-anchor="middle">3</text>
+			<text x="50" y="120" text-anchor="middle">4</text>
+			<text x="60" y="120" text-anchor="middle">5</text>
+			<text x="70" y="120" text-anchor="middle">6</text>
+			<text x="80" y="120" text-anchor="middle">7</text>
+			<text x="90" y="120" text-anchor="middle">8</text>
+			<text x="100" y="120" text-anchor="middle">9</text> 
+		</g>
+		<rect x="0" y="10" width="110" height="100" stroke="black" fill="none"></rect>
+		<g id="bars">
+			<line x1="10" x2="10" y1="110" y2="10" stroke="black" />
+			<line x1="20" x2="20" y1="110" y2="10" stroke="black" />
+			<line x1="30" x2="30" y1="110" y2="10" stroke="black" />
+			<line x1="40" x2="40" y1="110" y2="10" stroke="black" />
+			<line x1="50" x2="50" y1="110" y2="10" stroke="black" />
+			<line x1="60" x2="60" y1="110" y2="10" stroke="black" />
+			<line x1="70" x2="70" y1="110" y2="10" stroke="black" />
+			<line x1="80" x2="80" y1="110" y2="10" stroke="black" />
+			<line x1="90" x2="90" y1="110" y2="10" stroke="black" />
+			<line x1="100" x2="100" y1="110" y2="10" stroke="black" /> 
+		</g>
+	</svg>
+	<textarea id="fn">
+
+  min = Math.ceil(min);
+  max = Math.floor(max);
+
+  if (weight < 0 || weight > 1) {
+    throw new Error('Weight should be between 0 and 1.');
+  }
+
+  const weightOffset = (weight + 0.5) % 1;
+
+  // Generate a random number
+  const randomValue = Math.random();
+
+  // Apply the weight as a power function
+  const distribution = weightOffset <= 0.5 ? 1 - (2 * weightOffset) : 2 * (weightOffset - 0.5);
+  const weightedRandomValue = weightOffset <= 0.5 ? Math.pow(randomValue, distribution) : 1 - Math.pow(1 - randomValue, distribution);
+
+  // Ensure that the weighted random value does not fall out bounds
+  const clampedWeightedRandomValue = weight === 0 ? 0 : Math.min(weightedRandomValue, 1 - Number.EPSILON);
+
+  // Calculate the resulting integer using the weighted random value
+  return Math.floor(clampedWeightedRandomValue * (max - min + 1)) + min;
+</textarea>
+	<div class="controls">
+		<input id="weight" type="number" min="-2" max="2" step="0.05" value="0.5" />
+		<button id="update" type="button">Update</button>
+	</div>
+	<pre id="results"></pre>
+</div>
+
+<script>
+
+	document.getElementById('update').addEventListener('click',doUpdate);
+	document.getElementById('weight').addEventListener('change',doUpdate);
+	const weightElement = document.getElementById('weight');
+	const fnElement = document.getElementById('fn');
+	const resultsElement = document.getElementById('results');
+	const graphElement = document.getElementById('graph');
+	const bars = document.querySelectorAll('#bars > line')
+	
+	var editor = ace.edit(fnElement)
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/javascript");
+	editor.renderer.setShowGutter(false);
+	window.freshUpdate = true;
+	doUpdate();
+	function doUpdate(){
+		window.freshUpdate = true
+		// const innerFn = fnElement.value;
+		const innerFn = editor.getValue();
+		eval(`window.randIntWeighted = function(min, max, weight) {
+			${innerFn};
+		}`);
+		const weight = Number(weightElement.value);
+		let results = {};
+		let highest = 0;
+		for(let i=0; i<100000; i++){
+			v = randIntWeighted(0,9,weight);
+			window.freshUpdate = false;
+			if(!results[v]) results[v] = 1;
+			else results[v]++
+		}
+		const resultsArray = Object.keys(results).map(k=>{
+			const c = results[k];
+			highest = Math.max(highest,c)
+			return {k, c}
+		})
+		// console.log('results',results)
+		resultsElement.innerHTML = JSON.stringify(resultsArray,null,2);
+		bars.forEach((bar,i)=>{
+			const c = results?.[i] ?? 0;
+			bar.setAttribute('y2',110-(100*(c/highest)))
+		})
+		resultsArray.sort((a,b)=>a.c>b.c?1:a.c<b.c?-1:0)
+	}
+</script>
